@@ -267,33 +267,332 @@
 
 
 
+# from flask import Flask, request, jsonify
+# from flask_cors import CORS
+# import requests
+# import threading
+# import time
+
+# app = Flask(__name__)
+# CORS(app)  # Enable CORS for frontend-backend communication
+
+# # Telegram Configuration
+# TELEGRAM_TOKEN = "7456725624:AAHmNYrGKRjY34Vb9MZgHwlFn-8uMqQqlKg"
+# CHAT_ID = "7003841804"
+# TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
+
+# # Store messages in memory (use database in production)
+# messages = []
+# last_update_id = 0
+
+# @app.route('/api/send-message', methods=['POST'])
+# def send_message():
+#     """Send message from chatbot to Telegram"""
+#     try:
+#         data = request.json
+#         message_text = data.get('message')
+        
+#         if not message_text:
+#             return jsonify({'error': 'Message is required'}), 400
+        
+#         # Send message to Telegram
+#         response = requests.post(
+#             f"{TELEGRAM_API_URL}/sendMessage",
+#             json={
+#                 'chat_id': CHAT_ID,
+#                 'text': message_text
+#             }
+#         )
+        
+#         result = response.json()
+        
+#         if result.get('ok'):
+#             return jsonify({
+#                 'success': True,
+#                 'message': 'Message sent to Telegram'
+#             })
+#         else:
+#             return jsonify({
+#                 'error': result.get('description', 'Failed to send message')
+#             }), 400
+            
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
+
+# @app.route('/api/send-file', methods=['POST'])
+# def send_file():
+#     """Send file from chatbot to Telegram"""
+#     try:
+#         if 'file' not in request.files:
+#             return jsonify({'error': 'No file provided'}), 400
+        
+#         file = request.files['file']
+        
+#         # Send file to Telegram
+#         response = requests.post(
+#             f"{TELEGRAM_API_URL}/sendDocument",
+#             data={'chat_id': CHAT_ID},
+#             files={'document': (file.filename, file.stream, file.content_type)}
+#         )
+        
+#         result = response.json()
+        
+#         if result.get('ok'):
+#             return jsonify({
+#                 'success': True,
+#                 'message': 'File sent to Telegram'
+#             })
+#         else:
+#             return jsonify({
+#                 'error': result.get('description', 'Failed to send file')
+#             }), 400
+            
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
+
+# @app.route('/api/get-messages', methods=['GET'])
+# def get_messages():
+#     """Get new messages from Telegram"""
+#     global last_update_id
+    
+#     try:
+#         # Get updates from Telegram
+#         response = requests.get(
+#             f"{TELEGRAM_API_URL}/getUpdates",
+#             params={
+#                 'offset': last_update_id + 1,
+#                 'timeout': 30
+#             }
+#         )
+        
+#         result = response.json()
+        
+#         if not result.get('ok'):
+#             return jsonify({'error': 'Failed to get updates'}), 400
+        
+#         new_messages = []
+#         updates = result.get('result', [])
+        
+#         for update in updates:
+#             last_update_id = max(last_update_id, update['update_id'])
+            
+#             message = update.get('message', {})
+            
+#             # Handle text messages
+#             if 'text' in message:
+#                 new_messages.append({
+#                     'type': 'text',
+#                     'content': message['text'],
+#                     'sender': message.get('from', {}).get('first_name', 'User'),
+#                     'timestamp': message.get('date')
+#                 })
+            
+#             # Handle documents/files
+#             elif 'document' in message:
+#                 doc = message['document']
+#                 new_messages.append({
+#                     'type': 'file',
+#                     'content': doc.get('file_name', 'File'),
+#                     'file_id': doc.get('file_id'),
+#                     'sender': message.get('from', {}).get('first_name', 'User'),
+#                     'timestamp': message.get('date')
+#                 })
+            
+#             # Handle photos
+#             elif 'photo' in message:
+#                 photo = message['photo'][-1]  # Get largest photo
+#                 new_messages.append({
+#                     'type': 'photo',
+#                     'content': 'Photo',
+#                     'file_id': photo.get('file_id'),
+#                     'sender': message.get('from', {}).get('first_name', 'User'),
+#                     'timestamp': message.get('date')
+#                 })
+        
+#         return jsonify({
+#             'success': True,
+#             'messages': new_messages
+#         })
+        
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
+
+# @app.route('/api/get-file', methods=['GET'])
+# def get_file():
+#     """Get file from Telegram"""
+#     try:
+#         file_id = request.args.get('file_id')
+        
+#         if not file_id:
+#             return jsonify({'error': 'file_id is required'}), 400
+        
+#         # Get file path
+#         response = requests.get(
+#             f"{TELEGRAM_API_URL}/getFile",
+#             params={'file_id': file_id}
+#         )
+        
+#         result = response.json()
+        
+#         if result.get('ok'):
+#             file_path = result['result']['file_path']
+#             file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+            
+#             return jsonify({
+#                 'success': True,
+#                 'file_url': file_url
+#             })
+#         else:
+#             return jsonify({
+#                 'error': result.get('description', 'Failed to get file')
+#             }), 400
+            
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
+
+# @app.route('/api/webhook', methods=['POST'])
+# def webhook():
+#     """Webhook endpoint for Telegram updates (alternative to polling)"""
+#     try:
+#         update = request.json
+        
+#         # Process the update
+#         message = update.get('message', {})
+        
+#         if 'text' in message:
+#             # Store or process the message
+#             messages.append({
+#                 'type': 'text',
+#                 'content': message['text'],
+#                 'sender': message.get('from', {}).get('first_name', 'User'),
+#                 'timestamp': message.get('date')
+#             })
+        
+#         return jsonify({'success': True})
+        
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
+
+# @app.route('/api/set-webhook', methods=['POST'])
+# def set_webhook():
+#     """Set webhook URL for Telegram"""
+#     try:
+#         data = request.json
+#         webhook_url = data.get('url')
+        
+#         if not webhook_url:
+#             return jsonify({'error': 'Webhook URL is required'}), 400
+        
+#         response = requests.post(
+#             f"{TELEGRAM_API_URL}/setWebhook",
+#             json={'url': webhook_url}
+#         )
+        
+#         result = response.json()
+        
+#         if result.get('ok'):
+#             return jsonify({
+#                 'success': True,
+#                 'message': 'Webhook set successfully'
+#             })
+#         else:
+#             return jsonify({
+#                 'error': result.get('description', 'Failed to set webhook')
+#             }), 400
+            
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
+
+# @app.route('/api/delete-webhook', methods=['POST'])
+# def delete_webhook():
+#     """Delete webhook (use polling instead)"""
+#     try:
+#         response = requests.post(f"{TELEGRAM_API_URL}/deleteWebhook")
+#         result = response.json()
+        
+#         if result.get('ok'):
+#             return jsonify({
+#                 'success': True,
+#                 'message': 'Webhook deleted successfully'
+#             })
+#         else:
+#             return jsonify({
+#                 'error': result.get('description', 'Failed to delete webhook')
+#             }), 400
+            
+#     except Exception as e:
+#         return jsonify({'error': str(e)}), 500
+
+# @app.route('/health', methods=['GET'])
+# def health():
+#     """Health check endpoint"""
+#     return jsonify({'status': 'healthy'})
+
+# if __name__ == '__main__':
+#     # Delete any existing webhook before starting
+#     requests.post(f"{TELEGRAM_API_URL}/deleteWebhook")
+    
+#     # Run Flask app
+#     app.run(debug=True, host='0.0.0.0', port=5000)
+
+
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
-import threading
-import time
+import os
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend-backend communication
+
+# Configure CORS properly for production
+CORS(app, 
+     resources={r"/api/*": {"origins": "*"}},
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "OPTIONS"])
 
 # Telegram Configuration
-TELEGRAM_TOKEN = "7456725624:AAHmNYrGKRjY34Vb9MZgHwlFn-8uMqQqlKg"
-CHAT_ID = "7003841804"
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '7456725624:AAHmNYrGKRjY34Vb9MZgHwlFn-8uMqQqlKg')
+CHAT_ID = os.environ.get('CHAT_ID', '7003841804')
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-# Store messages in memory (use database in production)
-messages = []
+# Store last update ID
 last_update_id = 0
 
-@app.route('/api/send-message', methods=['POST'])
+@app.route('/')
+def home():
+    """Root endpoint"""
+    return jsonify({
+        'status': 'online',
+        'message': 'Telegram Chatbot API',
+        'endpoints': {
+            'send_message': '/api/send-message',
+            'send_file': '/api/send-file',
+            'get_messages': '/api/get-messages',
+            'health': '/health'
+        }
+    })
+
+@app.route('/health')
+def health():
+    """Health check endpoint"""
+    return jsonify({'status': 'healthy', 'service': 'telegram-chatbot'})
+
+@app.route('/api/send-message', methods=['POST', 'OPTIONS'])
 def send_message():
     """Send message from chatbot to Telegram"""
+    # Handle preflight request
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     try:
-        data = request.json
+        data = request.get_json()
         message_text = data.get('message')
         
         if not message_text:
             return jsonify({'error': 'Message is required'}), 400
+        
+        print(f"Sending message: {message_text}")
         
         # Send message to Telegram
         response = requests.post(
@@ -301,10 +600,12 @@ def send_message():
             json={
                 'chat_id': CHAT_ID,
                 'text': message_text
-            }
+            },
+            timeout=10
         )
         
         result = response.json()
+        print(f"Telegram response: {result}")
         
         if result.get('ok'):
             return jsonify({
@@ -313,26 +614,36 @@ def send_message():
             })
         else:
             return jsonify({
+                'success': False,
                 'error': result.get('description', 'Failed to send message')
             }), 400
             
+    except requests.exceptions.Timeout:
+        return jsonify({'success': False, 'error': 'Request timeout'}), 504
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/send-file', methods=['POST'])
+@app.route('/api/send-file', methods=['POST', 'OPTIONS'])
 def send_file():
     """Send file from chatbot to Telegram"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
         
         file = request.files['file']
         
+        print(f"Sending file: {file.filename}")
+        
         # Send file to Telegram
         response = requests.post(
             f"{TELEGRAM_API_URL}/sendDocument",
             data={'chat_id': CHAT_ID},
-            files={'document': (file.filename, file.stream, file.content_type)}
+            files={'document': (file.filename, file.stream, file.content_type)},
+            timeout=30
         )
         
         result = response.json()
@@ -344,31 +655,41 @@ def send_file():
             })
         else:
             return jsonify({
+                'success': False,
                 'error': result.get('description', 'Failed to send file')
             }), 400
             
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/get-messages', methods=['GET'])
+@app.route('/api/get-messages', methods=['GET', 'OPTIONS'])
 def get_messages():
     """Get new messages from Telegram"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
     global last_update_id
     
     try:
-        # Get updates from Telegram
+        # Get updates from Telegram with shorter timeout
         response = requests.get(
             f"{TELEGRAM_API_URL}/getUpdates",
             params={
                 'offset': last_update_id + 1,
-                'timeout': 30
-            }
+                'timeout': 10  # Shorter timeout for better responsiveness
+            },
+            timeout=15
         )
         
         result = response.json()
         
         if not result.get('ok'):
-            return jsonify({'error': 'Failed to get updates'}), 400
+            return jsonify({
+                'success': False,
+                'error': 'Failed to get updates',
+                'messages': []
+            }), 400
         
         new_messages = []
         updates = result.get('result', [])
@@ -400,7 +721,7 @@ def get_messages():
             
             # Handle photos
             elif 'photo' in message:
-                photo = message['photo'][-1]  # Get largest photo
+                photo = message['photo'][-1]
                 new_messages.append({
                     'type': 'photo',
                     'content': 'Photo',
@@ -414,123 +735,61 @@ def get_messages():
             'messages': new_messages
         })
         
+    except requests.exceptions.Timeout:
+        return jsonify({
+            'success': True,
+            'messages': []  # Return empty array on timeout
+        })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"Error getting messages: {str(e)}")
+        return jsonify({
+            'success': True,
+            'messages': []
+        })
 
-@app.route('/api/get-file', methods=['GET'])
-def get_file():
-    """Get file from Telegram"""
+@app.route('/api/test-telegram', methods=['GET'])
+def test_telegram():
+    """Test Telegram connection"""
     try:
-        file_id = request.args.get('file_id')
-        
-        if not file_id:
-            return jsonify({'error': 'file_id is required'}), 400
-        
-        # Get file path
-        response = requests.get(
-            f"{TELEGRAM_API_URL}/getFile",
-            params={'file_id': file_id}
-        )
-        
+        response = requests.get(f"{TELEGRAM_API_URL}/getMe", timeout=5)
         result = response.json()
         
-        if result.get('ok'):
-            file_path = result['result']['file_path']
-            file_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
-            
-            return jsonify({
-                'success': True,
-                'file_url': file_url
-            })
-        else:
-            return jsonify({
-                'error': result.get('description', 'Failed to get file')
-            }), 400
-            
+        return jsonify({
+            'success': result.get('ok'),
+            'bot_info': result.get('result'),
+            'chat_id': CHAT_ID
+        })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
-@app.route('/api/webhook', methods=['POST'])
-def webhook():
-    """Webhook endpoint for Telegram updates (alternative to polling)"""
-    try:
-        update = request.json
-        
-        # Process the update
-        message = update.get('message', {})
-        
-        if 'text' in message:
-            # Store or process the message
-            messages.append({
-                'type': 'text',
-                'content': message['text'],
-                'sender': message.get('from', {}).get('first_name', 'User'),
-                'timestamp': message.get('date')
-            })
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# Error handlers
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({
+        'error': 'Endpoint not found',
+        'available_endpoints': [
+            '/api/send-message',
+            '/api/send-file',
+            '/api/get-messages',
+            '/api/test-telegram',
+            '/health'
+        ]
+    }), 404
 
-@app.route('/api/set-webhook', methods=['POST'])
-def set_webhook():
-    """Set webhook URL for Telegram"""
-    try:
-        data = request.json
-        webhook_url = data.get('url')
-        
-        if not webhook_url:
-            return jsonify({'error': 'Webhook URL is required'}), 400
-        
-        response = requests.post(
-            f"{TELEGRAM_API_URL}/setWebhook",
-            json={'url': webhook_url}
-        )
-        
-        result = response.json()
-        
-        if result.get('ok'):
-            return jsonify({
-                'success': True,
-                'message': 'Webhook set successfully'
-            })
-        else:
-            return jsonify({
-                'error': result.get('description', 'Failed to set webhook')
-            }), 400
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/delete-webhook', methods=['POST'])
-def delete_webhook():
-    """Delete webhook (use polling instead)"""
-    try:
-        response = requests.post(f"{TELEGRAM_API_URL}/deleteWebhook")
-        result = response.json()
-        
-        if result.get('ok'):
-            return jsonify({
-                'success': True,
-                'message': 'Webhook deleted successfully'
-            })
-        else:
-            return jsonify({
-                'error': result.get('description', 'Failed to delete webhook')
-            }), 400
-            
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/health', methods=['GET'])
-def health():
-    """Health check endpoint"""
-    return jsonify({'status': 'healthy'})
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
     # Delete any existing webhook before starting
-    requests.post(f"{TELEGRAM_API_URL}/deleteWebhook")
+    try:
+        requests.post(f"{TELEGRAM_API_URL}/deleteWebhook", timeout=5)
+        print("Webhook deleted successfully")
+    except:
+        print("Could not delete webhook")
     
-    # Run Flask app
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
