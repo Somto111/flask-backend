@@ -21,7 +21,15 @@ from flask_mail import Mail, Message
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+# Add this to your Flask app for better CORS support
+CORS(app, resources={
+    r"/*": {
+        "origins": ["https://your-netlify-site.netlify.app", "http://localhost:*"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 app.secret_key = "mysupersecretkey123"
 
 MAILCHIMP_API_KEY = os.getenv("MAILCHIMP_API_KEY")
