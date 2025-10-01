@@ -264,6 +264,8 @@
 
 
 
+
+
 import hashlib
 import os
 from flask import Flask, request, jsonify, render_template, flash, url_for
@@ -430,8 +432,112 @@ def get_all_messages():
     return jsonify({
         "messages": messages,
         "count": len(messages),
-        "queue_size": len(message_queue)
+        "queue_size": len(message_queue),
+        "last_processed_id": last_processed_update_id
     })
+
+@app.route('/test_telegram', methods=['GET'])
+def test_telegram():
+    """Test Telegram connection and get recent updates"""
+    try:
+        # Test bot connection
+        bot_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe"
+        bot_response = requests.get(bot_url, timeout=10)
+        bot_data = bot_response.json()
+        
+        # Get recent updates
+        updates_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
+        updates_response = requests.get(updates_url, timeout=10)
+        updates_data = updates_response.json()
+        
+        result = {
+            "bot_connected": bot_data.get("ok", False),
+            "bot_info": bot_data.get("result", {}),
+            "monitoring_chat_id": CHAT_ID,
+            "recent_updates_count": len(updates_data.get("result", [])),
+            "recent_updates": updates_data.get("result", [])[-5:] if updates_data.get("ok") else []  # Last 5 updates
+        }
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
+@app.route('/force_poll', methods=['GET'])
+def force_poll():
+    """Manually trigger a poll to get latest messages"""
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        
+        if data.get("ok"):
+            updates = data.get("result", [])
+            processed = []
+            
+            for update in updates:
+                if "message" in update:
+                    message = update['message']
+                    chat_id = str(message['chat']['id'])
+                    text = message.get('text', '')
+                    from_user = message.get('from', {})
+                    is_bot = from_user.get('is_bot', False)
+                    
+                    processed.append({
+                        "chat_id": chat_id,
+                        "text": text,
+                        "is_bot": is_bot,
+                        "matches_target": chat_id == CHAT_ID,
+                        "is_user_message": text.startswith("💬 User:")
+                    })
+            
+            return jsonify({
+                "status": "success",
+                "updates_found": len(updates),
+                "target_chat_id": CHAT_ID,
+                "processed_messages": processed
+            }), 200
+        else:
+            return jsonify({
+                "status": "error",
+                "error": data.get("description", "Unknown error")
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
+@app.route('/test_telegram', methods=['GET'])
+def test_telegram():
+    """Test Telegram connection"""
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe"
+        response = requests.get(url)
+        data = response.json()
+        
+        if data.get("ok"):
+            bot_info = data.get("result", {})
+            return jsonify({
+                "status": "connected",
+                "bot_username": bot_info.get("username"),
+                "bot_name": bot_info.get("first_name"),
+                "monitoring_chat": CHAT_ID
+            }), 200
+        else:
+            return jsonify({
+                "status": "error",
+                "error": data.get("description")
+            }), 500
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
 
 @app.route('/clear_messages', methods=['POST'])
 def clear_messages():
@@ -477,7 +583,8 @@ def poll_telegram_updates():
 
                         # Only process messages from your chat that are NOT from the bot
                         # and don't start with "💬 User:" (our own sent messages)
-                        if chat_id == CHAT_ID and not is_bot and not text.startswith("💬 User:"):
+                        # Compare as strings to avoid type mismatch
+                        if str(chat_id) == str(CHAT_ID) and not is_bot and not text.startswith("💬 User:"):
                             # Avoid processing the same message twice
                             if last_processed_update_id != message_id:
                                 msg_obj = {
